@@ -205,7 +205,6 @@ misclassification_rate(confusion_matrix(predict_mode(mach4, select(training, Not
 
 
 
-
 #logistic and logistic regression
 
 coerce!(training, :labels => OrderedFactor)
@@ -221,3 +220,12 @@ logistic_fit = fit!(machine(LogisticClassifier(penalty = :l2, lambda = 1e-5),
 confusion_matrix(predict_mode(logistic_fit, select(validation, Not(:labels))),  validation.labels)
 misclassification_rate(confusion_matrix(predict_mode(logistic_fit, select(validation, Not(:labels))),  validation.labels))
 misclassification_rate(confusion_matrix(predict_mode(logistic_fit, select(training, Not(:labels))),  training.labels))
+
+
+
+#PCA classification
+pca_class =fit!(machine(PCA(), training[:, 1:end-1]), verbosity = 0)
+#genes = pixel, cell = faces, label = name
+cells = training
+KAT5  = training[training.labels .== "KAT5", :]
+df[df.A .> 500, :]
