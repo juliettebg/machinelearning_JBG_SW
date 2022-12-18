@@ -10,9 +10,14 @@ Pkg.activate(joinpath(Pkg.devdir(), "MLCourse"))
 using Distributions
 using MLJ
 using MLJLinearModels
+using MLJXGBoostInterface
+using MLJMultivariateStatsInterface
 using MLCourse
 using OpenML
 using Plots
+using Statistics, StatsPlots
+Pkg.add(PlotlyJS)
+using PlotlyJS
 import MLCourse
 
 
@@ -46,17 +51,60 @@ df=deserialize("/Users/sabo4ever/Documents/GitHub/machinelearning_JBG_SW/trainin
 test=deserialize("/Users/sabo4ever/Documents/GitHub/machinelearning_JBG_SW/test.dat")
 
 ##
+plot_corr=@df predictors corrplot([:Gm1992 :Gm19938 :Gm37381 :Gm37323],
+                     grid = false, fillcolor = cgrad(), size = (700, 600))
+                     savefig(plot_corr,"corr.png")
+@df predictors corrplot([:Catip :Gm29107],
+                     grid = false, fillcolor = cgrad(), size = (700, 600))
+##
 using UMAP
-umap_proj = umap(Array(select(df, Not(:labels)))', 2, min_dist = .4, n_neighbors = 50);
+umap_proj = umap(Array(select(st_training, Not(:labels)))', 2, min_dist = .4, n_neighbors = 50);
 gr()
 umap_plot=scatter(umap_proj[1, :], umap_proj[2, :], legend = false,
         c = vcat([fill(i, 50) for i in 1:3]...), xlabel = "UMAP 1", ylabel = "UMAP 2")
-savefig(umap_plot,"umap.png")
+savefig(umap_plot,"umap2.png")
 ##
 using TSne
-tsne_proj = tsne(Array(select(df, Not(:labels))), 2, 0, 100, 50.0, progress = true);
+tsne_proj = tsne(Array(select(df, Not(:labels))), 2, 0, 2000, 80.0, progress = true);
+tsne_plot=scatter(tsne_proj[:, 1], tsne_proj[:, 2], legend = false,
+            c = vcat([fill(i, 50) for i in 1:3]...), xlabel = "tSNE 1", ylabel = "tSNE 2")
+savefig(tsne_plot,"tsne_80neighbors_2000iter.png")
+##
+#not much correlation between parameters, clusters do not correctly group labels, not useful
+             
+components = MLJ.transform(machvis, select(df,Not(:labels)))
+components.labels = df.labels
+projection = fitted_params(machvis).projection
+loadings = projection' .* report(machvis).principalvars
+plot(components, x=:x1, y=:x2, color=:labels, mode="markers",
+                     Layout(shapes=[line(x0=0, y0=0, x1=loadings[1, i], y1=loadings[2, i])
+                                for i in 1:length(df.labels)],
+                     annotations=[attr(x=loadings[1, i], y=loadings[2, i], text=names(select(df,Not(:labels)))[i],
+                                     xanchor="center", yanchor="bottom") 
+                                     for i in 1:length(df.labels)]
+                         ))
+pca_mach = fit!(machine(PCA(variance_ratio = 1), select(st_training, Not(:labels))),
+	            verbosity = 0)
+p1 = biplot(pca_mach, score_style = 2, loadings=20)
+savefig(p1,"pca20.png")
+MLJ.save("pca_mach.jlso",pca_mach)
 
+vars = report(pca_mach).pca.principalvars ./ report(pca_mach).pca.tvar
+p1 = plot(vars, label = nothing, yscale = :log10,
+          xlabel = "component", ylabel = "proportion of variance explained")
+p2 = plot(cumsum(vars),
+          label = nothing, xlabel = "component",
+          ylabel = "cumulative prop. of variance explained")
+p3 = plot(p1, p2, layout = (1, 2), size = (700, 400))
 
+pca_training_features = MLJ.transform(pca_mach, select(st_training,Not(:labels)))
+pca_training_features.labels = st_training.labels
+pca_validation=MLJ.transform(pca_mach, select(st_validation,Not(:labels)))
+pca_validation.labels = st_validation.labels
+serialize("pca_validation_data.dat", pca_validation)
+projection = fitted_params(pca_mach).projection
+
+##
 using Distances
 Pkg.add("MLJModelInterface")
 import MLJModelInterface
@@ -120,18 +168,14 @@ self_tuning_model = TunedModel(model = model1, # the model to be tuned
     logistic_misclassfication= mean(predict_mode(Mach_Logistic, select(st_validation, Not(:labels))) .!= st_validation.labels)
 
     MLJ.save("Mach_Logistic.jlso",Mach_Logistic)
-   #
-   model_reg = model_l |> LassoRegression()
-   self_tuning_model1 = TunedModel(model = model_reg,
-                                  tuning =  Grid(goal = 100),
-                                  resampling = CV(nfolds = 5),
-                                  range = [range(model_reg, :(logistic_classifier.lambda),
-                                                 lower = 1e-10, upper = 1e-3,
-                                                 scale = :log10)],
-                                  measure = MisclassificationRate())
-   self_tuning_mach1 = machine(self_tuning_model1, select(st_training, Not(:labels)), categorical(st_training.labels))
-   fit!(self_tuning_mach1, verbosity = 2)
-end;
+
+    Mach_Logistic_pca = machine(model_l,select(pca_training_features, Not(:labels)), categorical(pca_training_features.labels))
+    fit!(Mach_Logistic_pca)
+    pca_logistic_misclassfication_train= mean(predict_mode(Mach_Logistic_pca, select(pca_training_features, Not(:labels))) .!= pca_training_features.labels)
+    pca_logistic_misclassfication= mean(predict_mode(Mach_Logistic_pca, select(pca_validation, Not(:labels))) .!= pca_validation.labels)
+  
+    #
+  
 
    
     ##
@@ -170,11 +214,38 @@ MLJ.save("nndeep_mach.jlso",nndeep_mach)
 
 ##
 nndeeper_mach = machine(NeuralNetworkClassifier(
-                         builder = MLJFlux.@builder(Chain(Dense(n_in, 100, relu), Dense(100, 50, relu), Dense(50, 30, relu), Dense(30, 50, relu)Dense(50,n_out))),
+                         builder = MLJFlux.@builder(Chain(Dense(n_in, 100, relu), Dense(100, 50, relu), Dense(50, 30, relu), Dense(30, 50, relu),Dense(50,n_out))),
                          batch_size = 32,
                          epochs = 60),
                          select(st_training, Not(:labels)),
                          categorical(st_training.labels))
-fit!(nndeep_macher, verbosity = 2)
-nndeeper_misclass_validation= mean(predict_mode(nndeep_mach, select(st_validation, Not(:labels))) .!= st_validation.labels)
-nndeeper_dmisclassfication= mean(predict_mode(nn_mach, select(st_training, Not(:labels))) .!= st_training.labels)
+fit!(nndeeper_mach, verbosity = 2)
+nndeeper_misclass_validation= mean(predict_mode(nndeeper_mach, select(st_validation, Not(:labels))) .!= st_validation.labels)
+nndeeper_dmisclassfication= mean(predict_mode(nndeeper_mach, select(st_training, Not(:labels))) .!= st_training.labels)
+MLJ.save("nndeeper_mach.jlso",nndeeper_mach)
+
+##
+nndeeper1_mach = machine(NeuralNetworkClassifier(
+                         builder = MLJFlux.@builder(Chain(Dense(n_in, 100, tanh), Dense(100, 50, sigmoid), Dense(50, 50, relu), Dense(50, 50, sigmoid),Dense(50,n_out))),
+                         batch_size = 32,
+                         epochs = 60,
+                         lambda= 1,
+                         optimiser = ADAMW()),
+                         select(st_training, Not(:labels)),
+                         categorical(st_training.labels))
+fit!(nndeeper1_mach, verbosity = 2)
+nndeeper1_misclass_validation= mean(predict_mode(nndeeper1_mach, select(st_validation, Not(:labels))) .!= st_validation.labels)
+nndeeper1_misclassfication= mean(predict_mode(nndeeper1_mach, select(st_training, Not(:labels))) .!= st_training.labels)
+
+##
+nndeeper2_mach = machine(NeuralNetworkClassifier(
+                         builder = MLJFlux.@builder(Chain(Dense(n_in, 100, relu), Dense(100, 50, relu), Dense(50, 50, relu), Dense(50, 50, relu),Dense(50, 50, relu),Dense(50,n_out))),
+                         batch_size = 32,
+                         epochs = 60,
+                         lambda= 0.008,
+                         optimiser = ADAMW()),
+                         select(st_training, Not(:labels)),
+                         categorical(st_training.labels))
+fit!(nndeeper2_mach, verbosity = 2)
+nndeeper2_misclass_validation= mean(predict_mode(nndeeper2_mach, select(st_validation, Not(:labels))) .!= st_validation.labels)
+nndeeper2_misclassfication= mean(predict_mode(nndeeper2_mach, select(st_training, Not(:labels))) .!= st_training.labels)
