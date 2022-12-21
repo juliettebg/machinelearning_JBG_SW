@@ -14,9 +14,11 @@ using MLCourse
 using OpenML
 using Plots
 using Statistics, StatsPlots
+#change this path to the path of the folder containing all the files in our git repository
+folder = "/Users/juliettebg/Desktop/EPFL/MachineLearning/machinelearning_JBG_SW/"
 
-df = DataFrame(CSV.File("/Users/sabo4ever/Sabrina/EPFL/machine learning/Project/train.csv"))
-test=DataFrame(CSV.File("/Users/sabo4ever/Sabrina/EPFL/machine learning/Project/test.csv"))
+df = DataFrame(CSV.File(folder * "train.csv"))
+test=DataFrame(CSV.File(folder * "test.csv"))
 
 #data cleaning 
 df=dropmissing(df)
@@ -43,6 +45,8 @@ st_test=MLJ.transform(fit!(machine(Standardizer(), test_)), test_)#standardise t
 st_test_ = mapcols(col -> replace!(col, NaN=>0), st_test) # there are NaNs in the standardised test set so we replace them by 0
 
 #pca denoising
+pca_mach_whole= fit!(machine(PCA(variance_ratio = 1), select(st_data, Not(:labels))),
+	            verbosity = 0)
 pca_whole = MLJ.transform(pca_mach_whole, select(st_data,Not(:labels)))#labelled data transformed into PCA space
 pca_whole.labels = st_data.labels   
 pca_test=MLJ.transform(pca_mach_whole, st_test_)#test data projected onto same PCA space
@@ -55,16 +59,16 @@ Pkg.add(url = "https://github.com/JuliaAI/MLJLinearModels.jl", rev = "a41ee42", 
 solver = MLJLinearModels.LBFGS(optim_options = Optim.Options(time_limit = 100))
 model_l = LogisticClassifier(penalty = :l2, lambda = 1e-5, solver = solver)
 
+#run either the first two lines or the third one
 pca_Mach_Logistic_fin = machine(model_l,select(pca_whole, Not(:labels)), categorical(pca_whole.labels))
 fit!(pca_Mach_Logistic_fin)
-
-pca_Mach_Logistic_fin=machine(("pca_Mach_Logistic_whole.jlso"))## alternatively you could load this saved trained machine to save time 
-
+pca_Mach_Logistic_fin = machine((folder * "pca_Mach_Logistic_whole.jlso"))
 pca_logistic_predicition=predict_mode(pca_Mach_Logistic_fin, pca_test)
 
 ##neural network classifier
 using MLJFlux
 using Flux
+#run either the first two lines or the third one
 nndeeper_mach = machine(NeuralNetworkClassifier(
                          builder = MLJFlux.@builder(Chain(Dense(n_in, 100, relu), Dense(100, 50, relu), Dense(50, 30, relu), Dense(30, 50, relu),Dense(50,n_out))),
                          batch_size = 32,
@@ -73,7 +77,7 @@ nndeeper_mach = machine(NeuralNetworkClassifier(
                          select(st_data, Not(:labels)),
                          categorical(st_data.labels))
 fit!(nndeeper_mach, verbosity = 2)
-nndeeper_mach=machine(("nndeeper_mach_wholedata.jlso"))## alternatively you could load this saved trained machine to save time 
+nndeeper_mach=machine((folder*"nndeeper_mach_wholedata.jlso"))
 nn_predictions=predict_mode(nndeeper_mach, st_test_)
 
 ## output files
