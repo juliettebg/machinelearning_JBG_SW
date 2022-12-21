@@ -57,6 +57,9 @@ model_l = LogisticClassifier(penalty = :l2, lambda = 1e-5, solver = solver)
 
 pca_Mach_Logistic_fin = machine(model_l,select(pca_whole, Not(:labels)), categorical(pca_whole.labels))
 fit!(pca_Mach_Logistic_fin)
+
+pca_Mach_Logistic_fin=machine(("pca_Mach_Logistic_whole.jlso"))## alternatively you could load this saved trained machine to save time 
+
 pca_logistic_predicition=predict_mode(pca_Mach_Logistic_fin, pca_test)
 
 ##neural network classifier
@@ -70,6 +73,7 @@ nndeeper_mach = machine(NeuralNetworkClassifier(
                          select(st_data, Not(:labels)),
                          categorical(st_data.labels))
 fit!(nndeeper_mach, verbosity = 2)
+nndeeper_mach=machine(("nndeeper_mach_wholedata.jlso"))## alternatively you could load this saved trained machine to save time 
 nn_predictions=predict_mode(nndeeper_mach, st_test_)
 
 ## output files
