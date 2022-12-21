@@ -52,3 +52,19 @@ p2 = plot(cumsum(vars),
           label = nothing, xlabel = "component",
           ylabel = "cumulative prop. of variance explained")
 p3 = plot(p1, p2, layout = (1, 2), size = (700, 400))## combining plots together
+
+
+#3d plot with first 3 PC
+using PlotlyJS
+using PlotlyJS: plot
+df = st_data
+predictors=select(df,Not(:labels))
+features = Symbol.(names(predictors))
+machvis2 = machine(PCA(maxoutdim=3), df[!, features])
+fit!(machvis2)
+components = MLJ.transform(machvis2, df[!, features])
+components.labels = df.labels
+total_var = report(machvis2).tprincipalvar / report(machvis2).tvar
+p4 =plot(components, x=:x1, y=:x2, z=:x3, color=:labels,
+    kind="scatter3d", mode="markers",labels=attr(;[Symbol("x", i) => "PC $i" for i in 1:3]...),
+    Layout(title="Total explained variance: $(round(total_var, digits=2))"))
