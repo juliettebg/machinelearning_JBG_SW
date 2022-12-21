@@ -10,5 +10,6 @@ Here is a descrition of the files in our repository and their contents, by order
 2. pca_Mach_Logistic_whole.jlso and nndeeper_mach_wholedata.jlso : the saved machines that can be used to run the code faster, they are not necessary and the lines of code to use them are indicated in comments in the Main.jl file
 3. ML_Report.pdf : The report, in pdf format
 4. Sabirna.jl and juliette.jl : These are simply the files we used for the project to avoid conflicting changes. They contain all the machines we tested, as well as some code for different visualization methods we tried.
-5. pca.py : This was a test to use PCA and euclidian distance to classify data, done with python, but it didn't give good results, and was not used for our final results. 
-6. test.jl and test.py : Like their names suggests, these are our test files, which we used to get better acquainted with julia outside of a pluto notebook and with git, they contain no relevant code. 
+5. visualisation.jl : The codes used to produce the figures in the report, plus a few others. 
+6. pca.py : This was a test to use PCA and euclidian distance to classify data, done with python, but it didn't give good results, and was not used for our final results. 
+7. test.jl and test.py : Like their names suggests, these are our test files, which we used to get better acquainted with julia outside of a pluto notebook and with git, they contain no relevant code. 
