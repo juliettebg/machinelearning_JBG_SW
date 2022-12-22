@@ -4,7 +4,7 @@ Here is a descrition of the files in our repository and their contents, by order
     - Pkg.add("Optim", preserve = Pkg.PRESERVE_ALL)
       using Optim
       Pkg.add(url = "https://github.com/JuliaAI/MLJLinearModels.jl", rev = "a41ee42", preserve = Pkg.PRESERVE_ALL)
-      (These are line 55-57 of the file, you will need to run them first (after lines 1-16) and then restart julia before running the whole file again)
+      (These are line 55-57 of the file, you will need to run them first (after lines 1-16) and then restart julia before running the whole file again so that you have the right version)
     - This file also assumes that you have the train and test csv files in the same folder as our julia file, if you don't, please add them before running our code.
     - On line 18, change the path needs to be changed to the path towards the folder containing all the files in our git repository.
 2. pca_Mach_Logistic_whole.jlso and nndeeper_mach_wholedata.jlso : the saved machines that can be used to run the code faster, they are not necessary and the lines of code to use them are indicated in comments in the Main.jl file
